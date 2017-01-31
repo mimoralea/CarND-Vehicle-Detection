@@ -47,7 +47,7 @@ class Pipeline:
     def set_vehicle_tracking(self, vehicle_tracking):
         self.vehicle_tracking = vehicle_tracking
 
-    def draw_vehicles_boxes(self, img, squares, color=(0, 0, 255), thick=6):
+    def __draw_raw_boxes(self, img, squares, color=(0, 0, 255), thick=6):
         log.debug('drawing ' + str(len(squares)) + ' vehicles boxes')
 
         # make a copy of the image
@@ -61,24 +61,49 @@ class Pipeline:
         # return the image copy with boxes drawn
         return draw_img
 
+    def __draw_filtered_boxes(self, img, labels, color=(0, 255, 0), thick=6):
+        # Iterate through all detected cars
+        if len(labels) == 0:
+            return img
+
+        for car_number in range(1, labels[1]+1):
+            # Find pixels with each car_number label value
+            nonzero = (labels[0] == car_number).nonzero()
+            # Identify x and y values of those pixels
+            nonzeroy = np.array(nonzero[0])
+            nonzerox = np.array(nonzero[1])
+            # Define a bounding box based on min/max x and y
+            bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy)))
+            # Draw the box on the image
+            cv2.rectangle(img, bbox[0], bbox[1], color, thick)
+        # Return the image
+        return img
+
     def process_frame(self, img_in):
         self.frame_counter += 1
         log.info('processing frame ' + str(self.frame_counter))
 
         log.info('copying image for backup')
         img_out = np.copy(img_in)
+        img_out = imresize(img_out, (720, 1280))
 
         log.info('undistort image')
         img_out = self.camera.undistort(img_out)
 
         log.info('detect vehicles on frame')
-        squares = self.vehicle_detection.detect_vehicles(img_out)
+        filtered, squares = self.vehicle_detection.detect_vehicles(img_out)
 
         log.info('tracking vehicles by cleaning false positives')
-        squares = self.vehicle_tracking.remove_false_positives(squares)
+        labels = self.vehicle_tracking.remove_false_positives(img_out.shape[:2], filtered)
 
-        log.info('draw vehicle bounding boxes')
-        img_out = self.draw_vehicles_boxes(img_out, squares)
+        log.info('draw vehicle raw boxes')
+        img_out = self.__draw_raw_boxes(img_out, squares, (0, 0, 255), 2)
+
+        log.info('draw vehicle filtered boxes')
+        img_out = self.__draw_raw_boxes(img_out, filtered, (255, 0, 0), 5)
+
+        log.info('draw vehicle filtered boxes')
+        img_out = self.__draw_filtered_boxes(img_out, labels, (0, 255, 0), 6)
 
         log.info('return processed frame')
         return img_out
@@ -106,7 +131,7 @@ def main(args):
     camera.calibrate()
 
     vehicle_detection = VehicleDetection()
-
+    vehicle_detection.fit('small_datasets/')
     vehicle_tracking = VehicleTracking()
 
     pipeline = Pipeline()

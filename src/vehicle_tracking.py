@@ -1,30 +1,51 @@
+from collections import deque
 
+from scipy.ndimage.measurements import label
+
+import matplotlib.pyplot as plt
+import numpy as np
 import logging as log
-
 
 class VehicleTracking:
     def __init__(self):
-        pass
+        self.boxes_queue = deque()
+        self.nboxes = 10
 
-    def remove_false_positives(self, coordinates):
-        log.debug('removing false positives started with ' + str(len(coordinates)) + ' boxes')
+    def __add_heat(self, heatmap, boxlist):
+        # Iterate through list of bboxes
+        for box in boxlist:
+            # Add += 1 for all pixels inside each bbox
+            heatmap[box[0][1]:box[1][1], box[0][0]:box[1][0]] += 1
 
-        bboxes = [
-            ((275, 572), (380, 510)),
-            ((488, 563), (549, 518)),
-            ((554, 543), (582, 522)),
-            ((601, 555), (646, 522)),
-            ((657, 545), (685, 517)),
-            ((849, 678), (1135, 512))
-        ]
-        bboxes = [
-            ((275, 572), (380, 510)),
-            ((488, 563), (549, 518)),
-            ((554, 543), (582, 522)),
-            ((601, 555), (646, 522)),
-            ((657, 545), (685, 517)),
-            ((849, 678), (1135, 512))
-        ]
+        # Return updated heatmap
+        return heatmap
 
-        log.debug('ended with ' + str(len(bboxes)) + ' boxes')
-        return bboxes
+    def __apply_threshold(self, heatmap, threshold):
+        # Zero out pixels below the threshold
+        heatmap[heatmap <= threshold] = 0
+        # Return thresholded map
+        return heatmap
+
+    def remove_false_positives(self, shape, raw_boxes):
+        if len(self.boxes_queue) < self.nboxes:
+            self.boxes_queue.append(raw_boxes)
+            log.debug('not enough boxes history ' + str(len(self.boxes_queue)))
+            return []
+
+        log.debug('removing false positives')
+        self.boxes_queue.popleft()
+        self.boxes_queue.append(raw_boxes)
+        heatmap = np.zeros(shape, dtype=np.float)
+
+        for boxlist in self.boxes_queue:
+            heatmap = self.__add_heat(heatmap, boxlist)
+
+        heatmap = self.__apply_threshold(heatmap, 4)
+        #final_map = np.clip(heatmap - 2, 0, 255)
+        #plt.imshow(final_map, cmap='hot')
+        #plt.imshow(heatmap, cmap='hot')
+        #plt.show()
+
+        labels = label(heatmap)
+        log.debug('ended with ' + str(labels[1]) + ' cars')
+        return labels
