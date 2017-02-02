@@ -79,6 +79,21 @@ class Pipeline:
         # Return the image
         return img
 
+    def __overlay_heatmap(self, img, heatmap):
+        dark = np.zeros_like(heatmap).astype(np.uint8)
+        heatmap *= 255.0/heatmap.max()
+        overlay = np.dstack((heatmap, dark, dark)).astype(np.uint8)
+        log.debug('heatmap values')
+        log.debug(np.mean(heatmap))
+        log.debug(np.min(heatmap))
+        log.debug(np.max(heatmap))
+        log.debug('overlaying heatmap on top of image')
+        log.debug('image shape ' + str(img.shape))
+        log.debug('heatmap shape ' + str(heatmap.shape))
+        log.debug('overlay shape ' + str(overlay.shape))
+        img = cv2.addWeighted(img, 1, overlay, 0.5, 0)
+        return img
+
     def process_frame(self, img_in):
         self.frame_counter += 1
         log.info('processing frame ' + str(self.frame_counter))
@@ -94,16 +109,20 @@ class Pipeline:
         filtered, squares = self.vehicle_detection.detect_vehicles(img_out)
 
         log.info('tracking vehicles by cleaning false positives')
-        labels = self.vehicle_tracking.remove_false_positives(img_out.shape[:2], filtered)
+        labels, heatmap = self.vehicle_tracking.remove_false_positives(
+            img_out.shape[:2], filtered)
 
         log.info('draw vehicle raw boxes')
-        img_out = self.__draw_raw_boxes(img_out, squares, (0, 0, 255), 2)
+        # img_out = self.__draw_raw_boxes(img_out, squares, (0, 255, 0), 1)
 
         log.info('draw vehicle filtered boxes')
-        img_out = self.__draw_raw_boxes(img_out, filtered, (255, 0, 0), 5)
+        # img_out = self.__draw_raw_boxes(img_out, filtered, (0, 0, 255), 2)
 
         log.info('draw vehicle filtered boxes')
-        img_out = self.__draw_filtered_boxes(img_out, labels, (0, 255, 0), 6)
+        img_out = self.__draw_filtered_boxes(img_out, labels, (255, 0, 0), 3)
+
+        log.info('overlay heatmap')
+        img_out = self.__overlay_heatmap(img_out, heatmap)
 
         log.info('return processed frame')
         return img_out
@@ -131,7 +150,7 @@ def main(args):
     camera.calibrate()
 
     vehicle_detection = VehicleDetection()
-    vehicle_detection.fit('small_datasets/')
+    vehicle_detection.fit('datasets/', force=False)
     vehicle_tracking = VehicleTracking()
 
     pipeline = Pipeline()

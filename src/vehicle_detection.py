@@ -1,9 +1,10 @@
 """
 This is the module the detects vehicles in images
 """
-
+import os
 import glob
 import time
+import pickle
 import logging as log
 import matplotlib.image as mpimg
 import numpy as np
@@ -36,6 +37,18 @@ class VehicleDetection:
         self.hist_feat = True # Histogram features on or off
         self.hog_feat = True # HOG features on or off
         self.bins_range=(0, 256)
+
+        root_dir = os.path.dirname('.')
+        self.clf_pkl = root_dir + 'clf.pkl'
+        self.scaler_pkl = root_dir + 'scaler.pkl'
+        log.debug('pickle files ' + self.clf_pkl + ' and ' + self.scaler_pkl)
+        if os.path.exists(self.clf_pkl) and os.path.exists(self.scaler_pkl):
+            log.info('loading classifier and scaler from pickle files')
+            with open(self.clf_pkl, 'rb') as input:
+                self.clf = pickle.load(input)
+            with open(self.scaler_pkl, 'rb') as input:
+                self.scaler = pickle.load(input)
+
 
     def __bin_spatial(self, img): 
         # Use cv2.resize().ravel() to create the feature vector
@@ -119,11 +132,15 @@ class VehicleDetection:
             features.append(img_features)
         return features
 
-    def fit(self, datasets_path):
+    def fit(self, datasets_path, force=False):
         log.info('classifying with datasets on ' + datasets_path)
 
-        carsgen = glob.iglob(datasets_path + '/vehicles/**/*.jpeg', recursive=True)
-        notcarsgen = glob.iglob(datasets_path + '/non-vehicles/**/*.jpeg', recursive=True)
+        if self.clf and self.scaler and not force:
+            log.info('classifier appears to already be trained')
+            return
+
+        carsgen = glob.iglob(datasets_path + '/vehicles/**/*.jpg', recursive=True)
+        notcarsgen = glob.iglob(datasets_path + '/non-vehicles/**/*.jpg', recursive=True)
         cars = [car for car in carsgen]
         notcars = [notcar for notcar in notcarsgen]
 
@@ -179,6 +196,14 @@ class VehicleDetection:
         self.clf = svc
         self.scaler = X_scaler
 
+        with open(self.clf_pkl, 'wb') as output:
+            log.info('saving ' + self.clf_pkl)
+            pickle.dump(self.clf, output, pickle.HIGHEST_PROTOCOL)
+
+        with open(self.scaler_pkl, 'wb') as output:
+            log.info('saving ' + self.scaler_pkl)
+            pickle.dump(self.scaler, output, pickle.HIGHEST_PROTOCOL)
+
 
     def __slide_window(self, img, x_start_stop=[None, None], y_start_stop=[None, None],
                         xy_window=(64, 64), xy_overlap=(0.5, 0.5)):
@@ -225,25 +250,26 @@ class VehicleDetection:
 
         # extra large boxes
         xl_windows = self.__slide_window(
-            img, x_start_stop=[70, None], y_start_stop=[375, 675],
-            xy_window=(300, 300), xy_overlap=(0.5, 0.5))
+            img, x_start_stop=[30, 1250], y_start_stop=[375, 675],
+            xy_window=(300, 300), xy_overlap=(0.9, 0.5))
 
         # large boxes
         l_windows = self.__slide_window(
-            img, x_start_stop=[10, None], y_start_stop=[400, 650],
-            xy_window=(250, 250), xy_overlap=(0.8, 0.5))
+            img, x_start_stop=[50, 1200], y_start_stop=[400, 600],
+            xy_window=(200, 200), xy_overlap=(0.9, 0.5))
 
         # medium boxes
         m_windows = self.__slide_window(
-            img, x_start_stop=[150, 1200], y_start_stop=[300, 600],
-            xy_window=(150, 150), xy_overlap=(0.5, 0.5))
+            img, x_start_stop=[150, 1050], y_start_stop=[375, 600],
+            xy_window=(150, 150), xy_overlap=(0.8, 0.8))
 
         # small boxes
         s_windows = self.__slide_window(
-            img, x_start_stop=[400, 900], y_start_stop=[400, 550],
-            xy_window=(50, 50), xy_overlap=(0.5, 0.5))
+            img, x_start_stop=[300, 1000], y_start_stop=[375, 475],
+            xy_window=(50, 50), xy_overlap=(0.7, 0.7))
 
         windows = xl_windows + l_windows + m_windows + s_windows
+        # windows = m_windows
         return windows
 
     def __search_windows(self, img, windows):
@@ -262,7 +288,7 @@ class VehicleDetection:
             #7) If positive (prediction == 1) then save the window
             if prediction == 1:
                 on_windows.append(window)
-        #8) Return windows for positive detections
+        #8) Return windows for positive detection
         return on_windows
 
     def detect_vehicles(self, img):
@@ -273,5 +299,6 @@ class VehicleDetection:
         False positives should be detected by the vehicle tracking class
         """
         default_windows = self.__get_default_windows(img)
+        # features = self.__single_img_features(img)
         hot_windows = self.__search_windows(img, default_windows)
         return hot_windows, default_windows

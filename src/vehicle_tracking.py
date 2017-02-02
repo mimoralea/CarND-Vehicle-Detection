@@ -9,7 +9,7 @@ import logging as log
 class VehicleTracking:
     def __init__(self):
         self.boxes_queue = deque()
-        self.nboxes = 10
+        self.nboxes_lists = 10
 
     def __add_heat(self, heatmap, boxlist):
         # Iterate through list of bboxes
@@ -27,20 +27,21 @@ class VehicleTracking:
         return heatmap
 
     def remove_false_positives(self, shape, raw_boxes):
-        if len(self.boxes_queue) < self.nboxes:
+        heatmap = np.zeros(shape, dtype=np.float)
+        log.debug(heatmap.shape)
+        if len(self.boxes_queue) < self.nboxes_lists:
             self.boxes_queue.append(raw_boxes)
             log.debug('not enough boxes history ' + str(len(self.boxes_queue)))
-            return []
+            return [], heatmap
 
         log.debug('removing false positives')
         self.boxes_queue.popleft()
         self.boxes_queue.append(raw_boxes)
-        heatmap = np.zeros(shape, dtype=np.float)
 
         for boxlist in self.boxes_queue:
             heatmap = self.__add_heat(heatmap, boxlist)
 
-        heatmap = self.__apply_threshold(heatmap, 4)
+        heatmap = self.__apply_threshold(heatmap, 25)
         #final_map = np.clip(heatmap - 2, 0, 255)
         #plt.imshow(final_map, cmap='hot')
         #plt.imshow(heatmap, cmap='hot')
@@ -48,4 +49,4 @@ class VehicleTracking:
 
         labels = label(heatmap)
         log.debug('ended with ' + str(labels[1]) + ' cars')
-        return labels
+        return labels, heatmap

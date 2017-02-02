@@ -10,7 +10,7 @@ import pickle
 class Camera:
 
     def __init__(self, calibration_path):
-        root_dir = os.path.dirname(calibration_path + '/*.jpg')
+        root_dir = os.path.dirname(calibration_path)
         self.mtx_pkl = root_dir + '/mtx.pkl'
         self.dist_pkl = root_dir + '/dist.pkl'
         log.debug('pickle files ' + self.mtx_pkl + ' and ' + self.dist_pkl)
