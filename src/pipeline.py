@@ -3,6 +3,7 @@ from collections import deque
 from sys import argv
 from moviepy.editor import VideoFileClip
 from scipy.misc import imread, imresize
+from skimage import data, feature
 
 from camera import Camera
 from vehicle_detection import VehicleDetection
@@ -67,6 +68,7 @@ class Pipeline:
             return img
 
         for car_number in range(1, labels[1]+1):
+            log.debug('car number ' + str(car_number))
             # Find pixels with each car_number label value
             nonzero = (labels[0] == car_number).nonzero()
             # Identify x and y values of those pixels
@@ -75,23 +77,30 @@ class Pipeline:
             # Define a bounding box based on min/max x and y
             bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy)))
             # Draw the box on the image
+            x_dist = np.max(nonzerox) - np.min(nonzerox)
+            y_dist = np.max(nonzeroy) - np.min(nonzeroy)
+            log.debug('distances of x=%d and y=%d'.format(x_dist, y_dist))
+            # only draw squares and rectangles - but not too disproportionate
+            if x_dist > y_dist * 3 or y_dist > x_dist * 2:
+                continue
             cv2.rectangle(img, bbox[0], bbox[1], color, thick)
         # Return the image
         return img
 
     def __overlay_heatmap(self, img, heatmap):
-        dark = np.zeros_like(heatmap).astype(np.uint8)
+        # dark = np.zeros_like(heatmap).astype(np.uint8)
         heatmap *= 255.0/heatmap.max()
-        overlay = np.dstack((heatmap, dark, dark)).astype(np.uint8)
+        overlay = np.dstack((heatmap, heatmap, heatmap)).astype(np.uint8)
         log.debug('heatmap values')
         log.debug(np.mean(heatmap))
+        log.debug(np.median(heatmap))
         log.debug(np.min(heatmap))
         log.debug(np.max(heatmap))
         log.debug('overlaying heatmap on top of image')
         log.debug('image shape ' + str(img.shape))
         log.debug('heatmap shape ' + str(heatmap.shape))
         log.debug('overlay shape ' + str(overlay.shape))
-        img = cv2.addWeighted(img, 1, overlay, 0.5, 0)
+        img = cv2.addWeighted(img, 1, overlay, 0.999, 0)
         return img
 
     def process_frame(self, img_in):
@@ -118,11 +127,13 @@ class Pipeline:
         log.info('draw vehicle filtered boxes')
         # img_out = self.__draw_raw_boxes(img_out, filtered, (0, 0, 255), 2)
 
-        log.info('draw vehicle filtered boxes')
+        log.info('draw vehicle labels')
         img_out = self.__draw_filtered_boxes(img_out, labels, (255, 0, 0), 3)
 
         log.info('overlay heatmap')
         img_out = self.__overlay_heatmap(img_out, heatmap)
+
+        # cv2.putText(img_out, 'Hello', (50, 100), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1)
 
         log.info('return processed frame')
         return img_out
