@@ -116,7 +116,7 @@ class Pipeline:
         img_out = self.camera.undistort(img_out)
 
         log.info('detect vehicles on frame')
-        if self.frame_counter % 2 != 0:
+        if self.frame_counter % 5 != 0:
             filtered, squares = self.last_detection
         else:
             filtered, squares = self.vehicle_detection.detect_vehicles(img_out)
