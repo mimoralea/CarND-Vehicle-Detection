@@ -29,6 +29,7 @@ class Pipeline:
         self.camera = None
         self.vehicle_detection = None
         self.vehicle_tracking = None
+        self.last_detection = None
 
         if reset:
             log.info('cleaning up directories')
@@ -81,7 +82,7 @@ class Pipeline:
             y_dist = np.max(nonzeroy) - np.min(nonzeroy)
             log.debug('distances of x=%d and y=%d'.format(x_dist, y_dist))
             # only draw squares and rectangles - but not too disproportionate
-            if x_dist > y_dist * 3 or y_dist > x_dist * 2:
+            if x_dist > y_dist * 4 or y_dist > x_dist * 2:
                 continue
             cv2.rectangle(img, bbox[0], bbox[1], color, thick)
         # Return the image
@@ -115,7 +116,11 @@ class Pipeline:
         img_out = self.camera.undistort(img_out)
 
         log.info('detect vehicles on frame')
-        filtered, squares = self.vehicle_detection.detect_vehicles(img_out)
+        if self.frame_counter % 2 != 0:
+            filtered, squares = self.last_detection
+        else:
+            filtered, squares = self.vehicle_detection.detect_vehicles(img_out)
+            self.last_detection = (filtered, squares)
 
         log.info('tracking vehicles by cleaning false positives')
         labels, heatmap = self.vehicle_tracking.remove_false_positives(
@@ -132,8 +137,6 @@ class Pipeline:
 
         log.info('overlay heatmap')
         img_out = self.__overlay_heatmap(img_out, heatmap)
-
-        # cv2.putText(img_out, 'Hello', (50, 100), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1)
 
         log.info('return processed frame')
         return img_out

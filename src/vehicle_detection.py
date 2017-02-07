@@ -151,7 +151,7 @@ class VehicleDetection:
         log.info('ncars ' + str(len(cars)))
         log.info('nnotcars ' + str(len(notcars)))
 
-        self.color_space = 'HLS' # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
+        self.color_space = 'RGB' # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
         self.orient = 9  # HOG orientations
         self.pix_per_cell = 8 # HOG pixels per cell
         self.cell_per_block = 2
@@ -252,26 +252,25 @@ class VehicleDetection:
 
         # extra large boxes
         xl_windows = self.__slide_window(
-            img, x_start_stop=[30, 1250], y_start_stop=[375, 675],
-            xy_window=(300, 300), xy_overlap=(0.9, 0.8))
+            img, x_start_stop=[30, 1250], y_start_stop=[400, 700],
+            xy_window=(300, 300), xy_overlap=(0.5, 0.5))
 
         # large boxes
         l_windows = self.__slide_window(
-            img, x_start_stop=[50, 1200], y_start_stop=[400, 600],
-            xy_window=(200, 200), xy_overlap=(0.9, 0.8))
+            img, x_start_stop=[30, 1250], y_start_stop=[400, 600],
+            xy_window=(200, 200), xy_overlap=(0.6, 0.5))
 
         # medium boxes
         m_windows = self.__slide_window(
-            img, x_start_stop=[150, 1050], y_start_stop=[375, 600],
-            xy_window=(150, 150), xy_overlap=(0.9, 0.8))
+            img, x_start_stop=[30, 1250], y_start_stop=[400, 650],
+            xy_window=(125, 125), xy_overlap=(0.7, 0.5))
 
         # small boxes
         s_windows = self.__slide_window(
-            img, x_start_stop=[300, 1000], y_start_stop=[375, 450],
-            xy_window=(75, 75), xy_overlap=(0.9, 0.8))
+            img, x_start_stop=[300, 1000], y_start_stop=[400, 550],
+            xy_window=(75, 75), xy_overlap=(0.8, 0.5))
 
         windows = xl_windows + l_windows + m_windows + s_windows
-        # windows = m_windows
         return windows
 
     def __search_windows(self, img, windows):

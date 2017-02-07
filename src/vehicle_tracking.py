@@ -10,9 +10,9 @@ import logging as log
 class VehicleTracking:
     def __init__(self):
         self.labels_queue = deque()
-        self.nlabels = 15
+        self.nlabels = 25
         self.boxes_queue = deque()
-        self.nboxes_lists = 30
+        self.nboxes_lists = 40
 
     def __add_heat(self, heatmap, boxlist):
         # Iterate through list of bboxes
@@ -23,7 +23,7 @@ class VehicleTracking:
         # Return updated heatmap
         return heatmap
 
-    def __apply_threshold(self, heatmap, threshold = 10):
+    def __apply_threshold(self, heatmap, threshold = 40):
         # Zero out pixels below the threshold
         heatmap[heatmap <= threshold] = 0
         # Return thresholded map
